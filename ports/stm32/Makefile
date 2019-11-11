@@ -266,6 +266,7 @@ DRIVERS_SRC_C += $(addprefix drivers/,\
 	bus/softqspi.c \
 	memory/spiflash.c \
 	dht/dht.c \
+	neopixel/neopixel.c \
 	)
 
 SRC_C += \
