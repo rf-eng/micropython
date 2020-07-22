@@ -43,3 +43,7 @@ user.props
 # Generated rst files
 ######################
 genrst/
+
+# VScode/syntax highlighting related stuff
+######################
+ports/stm32/compile_commands.json
