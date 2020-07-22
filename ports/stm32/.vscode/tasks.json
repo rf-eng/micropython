@@ -1,0 +1,52 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build project",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "type": "shell",
+			"windows": {
+				"command": "mingw32-make"
+			},
+			"linux": {
+                "command": "make",
+                "args": [
+                    "GCC_PATH=${env:ELITEBOARDDIR}/gcc/bin/",
+                    "-j4",
+                    /*"BOARD=ELITEBOARD_H743XI",*/
+                    "BOARD=NUCLEO_H743ZI",
+                    "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
+                    "DEBUG=0"
+                ]
+            },
+            "osx": {
+                "command": "make",
+                "args": [
+                    "GCC_PATH=/usr/local/bin/",
+                    "-j4"
+                ]
+			},
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "presentation": {
+                "focus": true
+            },
+            "options": {
+                "shell": {
+                    "args": [],
+                    "executable": ""
+                }
+            }
+        }]
+}
