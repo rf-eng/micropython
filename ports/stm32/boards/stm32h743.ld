@@ -34,12 +34,6 @@ SECTIONS
 {
     .lwip_sec (NOLOAD) : {
     . = ABSOLUTE(0x30040000);
-    *(.RxDescrSect) 
-
-    . = ABSOLUTE(0x30040060);
-    *(.TxDescrSect)
-
-    . = ABSOLUTE(0x30040200);
-    *(.EthBufSect) 
+    *(.EthSect)
     } >RAM_D2 AT> FLASH
 }
