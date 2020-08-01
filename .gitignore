@@ -45,3 +45,6 @@ genrst/
 
 .project
 .pydevproject
+# cortex debug files
+ports/stm32/.vscode/.cortex-debug.registers.state.json
+ports/stm32/.vscode/.cortex-debug.peripherals.state.json
