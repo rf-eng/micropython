@@ -29,7 +29,7 @@
             /*"interface": "jtag",*/ /*swdp works much better*/
             "cwd": "${workspaceFolder}",
             "executable": "./build-ELITEBOARD_H743XI/firmware.elf",
-            "svdFile": "STM32H743x.svd",
+            "svdFile": "${workspaceFolder}/boards/STM32H743x.svd",
             "preLaunchTask": "Build project"
         }
     ]
