@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Cortex debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "bmp",
+            "BMPGDBSerialPort": "dummy",
+			"linux": {
+			    "armToolchainPath": "${env:ELITEBOARDDIR}/gcc/bin/",
+				"BMPGDBSerialPort": "/dev/ttyACM0",
+                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"] /*activate srst and reattach+load*/
+			},
+			"windows": {
+			    "armToolchainPath": "${env:ELITEBOARDDIR}/gcc/bin/",
+                "BMPGDBSerialPort": "COM9", /*If any of your ports are 10 or over, use this format: \\.\COM10*/
+                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"], /*activate srst and reattach+load*/
+            },
+            "osx": {
+			    "armToolchainPath": "/usr/local/bin/",
+                "BMPGDBSerialPort": "/dev/cu.usbmodem79AA5FA21",
+                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"], /*activate srst and reattach+load*/
+            },
+            "runToMain": false,
+            /*"interface": "jtag",*/ /*swdp works much better*/
+            "cwd": "${workspaceFolder}",
+            "executable": "./build-ELITEBOARD_H743XI/firmware.elf",
+            "svdFile": "STM32H743x.svd",
+            "preLaunchTask": "Build project"
+        }
+    ]
+}
