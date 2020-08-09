@@ -40,8 +40,8 @@ void ELITEBOARD_H743XI_board_early_init(void);
 #define MICROPY_HW_UART8_TX         (pin_J8)
 #define MICROPY_HW_UART8_RX         (pin_E0)
 
-#define MICROPY_HW_UART_REPL        PYB_UART_4
-#define MICROPY_HW_UART_REPL_BAUD   115200
+//#define MICROPY_HW_UART_REPL        PYB_UART_4
+//#define MICROPY_HW_UART_REPL_BAUD   115200
 
 // I2C busses
 #define MICROPY_HW_I2C2_SCL         (pin_H4)
