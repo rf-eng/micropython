@@ -35,6 +35,8 @@ void ELITEBOARD_H743XI_board_early_init(void);
 #define MICROPY_HW_UART2_RX         (pin_D6)
 #define MICROPY_HW_UART4_TX         (pin_B9)
 #define MICROPY_HW_UART4_RX         (pin_H14)
+#define MICROPY_HW_UART6_TX         (pin_C6)
+#define MICROPY_HW_UART6_RX         (pin_C7)
 #define MICROPY_HW_UART7_TX         (pin_F7)
 #define MICROPY_HW_UART7_RX         (pin_F6)
 #define MICROPY_HW_UART8_TX         (pin_J8)
@@ -77,6 +79,8 @@ void ELITEBOARD_H743XI_board_early_init(void);
 #define MICROPY_HW_USB_FS              (1)
 #define MICROPY_HW_USB_VBUS_DETECT_PIN (pin_A9)
 #define MICROPY_HW_USB_OTG_ID_PIN      (pin_A10)
+#define MICROPY_HW_USB_CDC_NUM      (2)
+#define MICROPY_HW_USB_ENABLE_CDC2  (1)
 
 // FDCAN bus
 #define MICROPY_HW_CAN1_NAME  "FDCAN1"
