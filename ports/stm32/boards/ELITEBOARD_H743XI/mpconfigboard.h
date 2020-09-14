@@ -57,6 +57,16 @@ void ELITEBOARD_H743XI_board_early_init(void);
 #define MICROPY_HW_SPI1_MISO        (pin_G9)
 #define MICROPY_HW_SPI1_MOSI        (pin_D7)
 
+#define MICROPY_HW_SPI2_NSS         (pin_I0)
+#define MICROPY_HW_SPI2_SCK         (pin_I1)
+#define MICROPY_HW_SPI2_MISO        (pin_I2)
+#define MICROPY_HW_SPI2_MOSI        (pin_I3)
+
+//#define MICROPY_HW_SPI5_NSS         (pin_K0)
+//#define MICROPY_HW_SPI5_SCK         (pin_)
+//#define MICROPY_HW_SPI5_MISO        (pin_)
+//#define MICROPY_HW_SPI5_MOSI        (pin_J10)
+
 // USRSW is pulled low. Pressing the button makes the input go high.
 //#define MICROPY_HW_USRSW_PIN        (pin_C13)
 //#define MICROPY_HW_USRSW_PULL       (GPIO_NOPULL)
