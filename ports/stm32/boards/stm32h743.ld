@@ -32,6 +32,11 @@ _heap_end = _sstack;
 /* Define output sections */
 SECTIONS
 {
+    .dma_buffer : /* Space before ':' is critical */
+    {
+        *(.dma_buffer)
+    } >RAM_D2
+
     .lwip_sec (NOLOAD) : {
     . = ABSOLUTE(0x30040000);
     *(.EthSect)
