@@ -68,6 +68,9 @@
 
 #if defined(STM32H7)
 #define DAC DAC1
+#define DMA_BUFFER \
+    __attribute__((section(".dma_buffer")))
+DMA_BUFFER uint8_t my_dma_buf[128];
 #endif
 
 #if defined(TIM6)
@@ -177,9 +180,21 @@ STATIC void dac_start_dma(uint32_t dac_channel, const dma_descr_t *dma_descr, ui
     #endif
     }
 
+    #if defined(STM32H7)
+    uint32_t * dmamux_c5r;
+    dmamux_c5r=(uint32_t*)(0x40020800+0x14);
+    *dmamux_c5r=67; //configure dmamux
+    #endif
+
     dma_nohal_deinit(dma_descr);
     dma_nohal_init(dma_descr, DMA_MEMORY_TO_PERIPH | dma_mode | dma_align);
+    #if !defined(STM32H7)
     dma_nohal_start(dma_descr, (uint32_t)buf, base + dac_align, len);
+    #else
+    memcpy((void*)&my_dma_buf[0], buf, 2*len); //reini: copy to mem that can be accessed by dma
+    dma_nohal_start(dma_descr, (uint32_t)&my_dma_buf[0], base + dac_align, len);
+    #endif
+
 
     DAC->CR |= DAC_CR_EN1 << dac_channel;
 }
