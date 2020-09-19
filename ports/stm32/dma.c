@@ -1164,6 +1164,11 @@ void dma_nohal_start(const dma_descr_t *descr, uint32_t src_addr, uint32_t dst_a
     dma->NDTR = len;
     dma->PAR = dst_addr;
     dma->M0AR = src_addr;
+    #if defined(STM32H7)
+    uint32_t * tmp;
+    tmp=(uint32_t*)0x4002000c;  //HIFCR: high interrupt flag clear register
+    *tmp = (1<<6 | 1<<9 | 1<<10 | 1<<11); //clear flags
+    #endif
     dma->CR |= DMA_SxCR_EN;
 }
 
