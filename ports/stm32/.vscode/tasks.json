@@ -9,14 +9,18 @@
             },
             "type": "shell",
 			"windows": {
-				"command": "mingw32-make",
-                "args": [
-                    "GCC_PATH=${env:ELITEBOARDDIR}/gcc/bin/",
-                    "-j4",
-                    "BOARD=ELITEBOARD_H743XI",
-                    "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
-                    "DEBUG=0"
-                ]
+                "command": "export PATH=/usr/local/bin:/usr/bin:$PATH; make GCC_PATH=\"$(cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/\")\" CROSS_COMPILE=\"$(cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/arm-none-eabi-\")\" -j4 BOARD=ELITEBOARD_H743XI DEBUG=0 V=1"
+				// "command": "export",  //use cygwin make
+                // "args": [
+                //     "PATH=/usr/local/bin:/usr/bin:$PATH; make",
+                //     //"make",
+                //     "GCC_PATH=cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/\"",
+                //     "-j4",
+                //     "BOARD=ELITEBOARD_H743XI",
+                //     "CROSS_COMPILE=cygpath -m '${env:ELITEBOARDDIR}/gcc/bin/arm-none-eabi-'",
+                //     "DEBUG=0",
+                //     "V=1"
+                // ]
 			},
 			"linux": {
                 "command": "make",
