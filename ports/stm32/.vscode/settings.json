@@ -1,0 +1,4 @@
+{    
+    "terminal.integrated.shell.windows": "C:\\tools\\cygwin\\bin\\bash.exe",
+    "terminal.integrated.shellArgs.windows": ["/usr/bin/xhere", "/bin/bash"]
+}
