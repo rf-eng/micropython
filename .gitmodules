@@ -42,3 +42,6 @@
 [submodule "lib/pico-sdk"]
 	path = lib/pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "extmod/upyscripts_eliteboard"]
+	path = extmod/upyscripts_eliteboard
+	url = git@github.com:rf-eng/upyscripts_eliteboard.git
