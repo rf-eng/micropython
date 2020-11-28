@@ -36,3 +36,6 @@
 [submodule "lib/nxp_driver"]
 	path = lib/nxp_driver
 	url = https://github.com/hathach/nxp_driver.git
+[submodule "extmod/upyscripts_eliteboard"]
+	path = extmod/upyscripts_eliteboard
+	url = git@github.com:rf-eng/upyscripts_eliteboard.git
