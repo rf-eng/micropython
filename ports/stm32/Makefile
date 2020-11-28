@@ -309,6 +309,7 @@ SRC_C += \
 	help.c \
 	machine_adc.c \
 	machine_i2c.c \
+	machine_i2s.c \
 	machine_spi.c \
 	machine_timer.c \
 	machine_uart.c \
@@ -336,7 +337,6 @@ SRC_C += \
 	servo.c \
 	dac.c \
 	adc.c \
-	i2s.c \
 	$(wildcard $(BOARD_DIR)/*.c)
 
 SRC_CXX += \
