@@ -45,3 +45,6 @@
 [submodule "extmod/upyscripts_eliteboard"]
 	path = extmod/upyscripts_eliteboard
 	url = git@github.com:rf-eng/upyscripts_eliteboard.git
+[submodule "extmod/eliteboard_upyscripts"]
+	path = extmod/eliteboard_upyscripts
+	url = https://github.com/rf-eng/eliteboard_upyscripts.git
