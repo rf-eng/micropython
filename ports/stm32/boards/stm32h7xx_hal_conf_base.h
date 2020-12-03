@@ -41,6 +41,7 @@
 #include "stm32h7xx_hal_hcd.h"
 #include "stm32h7xx_hal_i2c.h"
 #include "stm32h7xx_hal_i2s.h"
+#include "stm32h7xx_hal_sai.h"
 #include "stm32h7xx_hal_iwdg.h"
 #include "stm32h7xx_hal_pcd.h"
 #include "stm32h7xx_hal_pwr.h"
@@ -69,6 +70,7 @@
 #define HAL_HASH_MODULE_ENABLED
 #define HAL_HCD_MODULE_ENABLED
 #define HAL_I2C_MODULE_ENABLED
+#define HAL_SAI_MODULE_ENABLED
 #define HAL_I2S_MODULE_ENABLED
 #define HAL_IWDG_MODULE_ENABLED
 #define HAL_PCD_MODULE_ENABLED
