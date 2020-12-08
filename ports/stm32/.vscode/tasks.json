@@ -63,5 +63,66 @@
                     "executable": ""
                 }
             }
+        },
+        {
+            "label": "Clean project",
+            "type": "shell",
+			"windows": {
+                "command": "export PATH=/usr/local/bin:/usr/bin:$PATH; make GCC_PATH=\"$(cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/\")\" CROSS_COMPILE=\"$(cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/arm-none-eabi-\")\" -j4 BOARD=ELITEBOARD_H743XI DEBUG=0 V=1 FROZEN_MANIFEST=./boards/ELITEBOARD_H743XI/manifest.py clean"
+				// "command": "export",  //use cygwin make
+                // "args": [
+                //     "PATH=/usr/local/bin:/usr/bin:$PATH; make",
+                //     //"make",
+                //     "GCC_PATH=cygpath -m \"${env:ELITEBOARDDIR}/gcc/bin/\"",
+                //     "-j4",
+                //     "BOARD=ELITEBOARD_H743XI",
+                //     "CROSS_COMPILE=cygpath -m '${env:ELITEBOARDDIR}/gcc/bin/arm-none-eabi-'",
+                //     "DEBUG=0",
+                //     "V=1"
+                // ]
+			},
+			"linux": {
+                "command": "make",
+                "args": [
+                    "GCC_PATH=${env:ELITEBOARDDIR}/gcc/bin/",
+                    "-j4",
+                    "BOARD=ELITEBOARD_H743XI",
+                    "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
+                    "DEBUG=0",
+                    "FROZEN_MANIFEST=./boards/ELITEBOARD_H743XI/manifest.py",
+                    "clean"
+                ]
+            },
+            "osx": {
+                "command": "make",
+                "args": [
+                    "GCC_PATH=${env:ELITEBOARDDIR}/gcc/bin/",
+                    "-j4",
+                    "BOARD=ELITEBOARD_H743XI",
+                    "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
+                    "DEBUG=0",
+                    "FROZEN_MANIFEST=./boards/ELITEBOARD_H743XI/manifest.py",
+                    "clean"
+                ]
+			},
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },
+            "presentation": {
+                "focus": true
+            },
+            "options": {
+                "shell": {
+                    "args": [],
+                    "executable": ""
+                }
+            }
         }]
 }
