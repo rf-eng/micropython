@@ -118,6 +118,10 @@ void mp_hal_ticks_cpu_enable(void) {
 // Tested on PYBD_SF6 @ 100-240MHz
 #define NS_OVERHEAD_HIGH (10)
 #define NS_OVERHEAD_LOW (10)
+#elif defined(STM32H7)
+// 
+#define NS_OVERHEAD_HIGH (10)
+#define NS_OVERHEAD_LOW (10)
 #endif
 
 #if defined(NS_OVERHEAD_LOW)
