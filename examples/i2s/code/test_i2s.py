@@ -187,9 +187,9 @@ def i2s_callback(s):
     #print('callback worked')
     
 #======= USER CONFIGURATION =======
-WAV_FILE = 'music-16k-16bits-stereo.wav'
+WAV_FILE = 'pcm1608s.wav'
 WAV_SAMPLE_SIZE_IN_BITS = 16
-FORMAT = I2S.STEREO
+FORMAT = I2S.MONO
 SAMPLE_RATE_IN_HZ = 8000
 #======= USER CONFIGURATION =======
 
@@ -230,54 +230,77 @@ idx = 0
 bufcnt = 0
 samplecnt = 0
 
-while True:
-    try:
-        buffer = audio_out.getbuffer()
-        if buffer != None:
-            #print(type(buffer))
-            #num_read = wav.readinto(buffer)
-            bufcnt += 1
-            bufcnt %= 8
-            #print(samplecnt)
-            #print(idx)
-            samplecnt = 0
-            if True:
-                for cnt in range(0,len(buffer),4):                               
-                    if testMode:
-                        if samplecnt == 0:
-                            sample = 2**15-1 #-0*int((bufcnt+1)*0.1*2**15)                    
-    #                     elif samplecnt in range(30, 30+20, 1):
-    #                         sample = int((idx%200)/200*2**14)
-    #                     elif samplecnt == (buflen//4)-1: #2 bytes, 2 channels (left/right)
-    #                         sample = int((idx%200)/200*2**14) #2**15
-                        else:
-                            sample = 0*idx #*int(((idx%512)/512)*2**14)
-                    else:
-                        #sample = int((bufcnt+1)*0.1*getSinValue(8*idx))
-                        if samplecnt == 0:
-                            sample = 2**15-1 #-0*int((bufcnt+1)*0.1*2**15)
-                        else:
-                            sample = int((2**15-1)*(0.5*math.sin(2*math.pi*(idx)*(1/32+7e-5)))) 
-                            #sample = int(0.5*getSinValue(3*idx))
+if not(testMode):
+    wav = open(WAV_FILE,'rb')
+    wav.seek(44) # advance to first byte of Data section in WAV file
+    isStarted = False
+    while True:
+        try:
+            buffer = audio_out.getbuffer()
+            if buffer != None:
+                num_read = wav.readinto(buffer)
+                num_written = audio_out.putbuffer(buffer)
+                if isStarted == False:
+                    audio_out.start()
+                    isStarted = True
+                # end of WAV file?
+                if num_read == 0:
+                    # advance to first byte of Data section
+                    pos = wav.seek(44) 
                     
-                    #sample = int(10*(idx%4096))
-                    #myint = ustruct.pack( "<i", sample )
-                    buffer[cnt] = sample & 0xFF # myint[0] #sample & 0xFF
-                    buffer[cnt+1] = sample>>8 # myint[1] #sample>>8
-                    #buffer[cnt+2] = 0 #1*(2**15) & 0xFF #sample & 0xFF
-                    #buffer[cnt+3] = 0 #1*(2**15) >>8 #sample>>8
-                    samplecnt += 1
-                    idx += 1
+        except (KeyboardInterrupt, Exception) as e:
+            print('caught exception {} {}'.format(type(e).__name__, e))
+            break
 
-            audio_out.putbuffer(buffer)            
-            #print(num_written)
-            if isStarted == False:
-                audio_out.start()
-                isStarted = True
-        else:
-            pass
-                    
-    except (KeyboardInterrupt, Exception) as e:
-        print('caught exception {} {}'.format(type(e).__name__, e))
-        audio_out.deinit()
-        break
+else:
+    while True:
+        try:
+            buffer = audio_out.getbuffer()
+            if buffer != None:
+                #print(type(buffer))
+                #num_read = wav.readinto(buffer)
+                bufcnt += 1
+                bufcnt %= 8
+                #print(samplecnt)
+                #print(idx)
+                samplecnt = 0
+                if True:
+                    for cnt in range(0,len(buffer),4):                               
+                        if testMode:
+                            if samplecnt == 0:
+                                sample = 2**15-1 #-0*int((bufcnt+1)*0.1*2**15)                    
+        #                     elif samplecnt in range(30, 30+20, 1):
+        #                         sample = int((idx%200)/200*2**14)
+        #                     elif samplecnt == (buflen//4)-1: #2 bytes, 2 channels (left/right)
+        #                         sample = int((idx%200)/200*2**14) #2**15
+                            else:
+                                sample = 0*idx #*int(((idx%512)/512)*2**14)
+                        else:
+                            #sample = int((bufcnt+1)*0.1*getSinValue(8*idx))
+                            if samplecnt == 0:
+                                sample = 2**15-1 #-0*int((bufcnt+1)*0.1*2**15)
+                            else:
+                                sample = int((2**15-1)*(0.5*math.sin(2*math.pi*(idx)*(1/32+7e-5)))) 
+                                #sample = int(0.5*getSinValue(3*idx))
+                        
+                        #sample = int(10*(idx%4096))
+                        #myint = ustruct.pack( "<i", sample )
+                        buffer[cnt] = sample & 0xFF # myint[0] #sample & 0xFF
+                        buffer[cnt+1] = sample>>8 # myint[1] #sample>>8
+                        #buffer[cnt+2] = 0 #1*(2**15) & 0xFF #sample & 0xFF
+                        #buffer[cnt+3] = 0 #1*(2**15) >>8 #sample>>8
+                        samplecnt += 1
+                        idx += 1
+
+                audio_out.putbuffer(buffer)            
+                #print(num_written)
+                if isStarted == False:
+                    audio_out.start()
+                    isStarted = True
+            else:
+                pass
+                        
+        except (KeyboardInterrupt, Exception) as e:
+            print('caught exception {} {}'.format(type(e).__name__, e))
+            audio_out.deinit()
+            break
