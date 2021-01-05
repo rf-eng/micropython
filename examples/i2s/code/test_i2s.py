@@ -187,15 +187,15 @@ def i2s_callback(s):
     #print('callback worked')
     
 #======= USER CONFIGURATION =======
-WAV_FILE = 'pcm1608s.wav'
+WAV_FILE = '/sd/pcm1608s.wav'
 WAV_SAMPLE_SIZE_IN_BITS = 16
-FORMAT = I2S.MONO
+FORMAT = I2S.STEREO
 SAMPLE_RATE_IN_HZ = 8000
 #======= USER CONFIGURATION =======
 
-sck_pin = Pin('BTN1') 
-ws_pin = Pin('BTN1')  
-sd_pin = Pin('BTN1')
+sck_pin = Pin.cpu.E5
+ws_pin = Pin.cpu.E4
+sd_pin = Pin.cpu.B2
 
 buflen = 2048
 
@@ -250,6 +250,7 @@ if not(testMode):
                     
         except (KeyboardInterrupt, Exception) as e:
             print('caught exception {} {}'.format(type(e).__name__, e))
+            audio_out.deinit()
             break
 
 else:
