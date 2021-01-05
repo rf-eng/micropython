@@ -137,7 +137,7 @@ typedef struct _machine_i2s_obj_t {
     uint32_t                active_buffer_index;
     machine_i2s_queue_t     active_queue;
     machine_i2s_queue_t     idle_queue;
-    uint8_t                 *dma_buffer;//[SIZEOF_DMA_BUFFER_IN_BYTES];
+    uint8_t                 *dma_buffer;
     pin_obj_t               *sck;
     pin_obj_t               *ws;
     pin_obj_t               *sd;
@@ -465,6 +465,31 @@ static void led_flash_info(int colour, int count) {
 // assumes init parameters are set up correctly
 STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
     #if defined (USE_SAI)
+    GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**SAI1_A_Block_A GPIO Configuration
+    PE5     ------> SAI1_SCK_A
+    PE4     ------> SAI1_FS_A
+    PB2     ------> SAI1_SD_A
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_4;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    /**SAI1_B_Block_B GPIO Configuration
+     PE3     ------> SAI1_SD_B
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
     #else
     // init the GPIO lines
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -566,10 +591,10 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
         __HAL_RCC_PLLI2S_ENABLE();
 #elif defined (STM32F767xx)
 #error I2S not yet supported on the STM32F767xx processor (future)
-#elif defined (USE_SAI)
-
 #else
-#error I2S does not support this processor
+    #if !defined (USE_SAI)
+    #error I2S does not support this processor
+    #endif
 #endif // STM32F405xx
 
     #if defined (USE_SAI)
@@ -581,77 +606,7 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
     {
         printf("error periph clk config");
     }
-    
-    hsai_BlockB1.Instance = SAI1_Block_B;
-    hsai_BlockB1.Init.Protocol = SAI_FREE_PROTOCOL;
-    hsai_BlockB1.Init.AudioMode = SAI_MODESLAVE_TX;
-    hsai_BlockB1.Init.DataSize = SAI_DATASIZE_16;
-    hsai_BlockB1.Init.FirstBit = SAI_FIRSTBIT_MSB;
-    hsai_BlockB1.Init.ClockStrobing = SAI_CLOCKSTROBING_FALLINGEDGE;
-    hsai_BlockB1.Init.Synchro = SAI_SYNCHRONOUS;
-    hsai_BlockB1.Init.OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
-    hsai_BlockB1.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
-    hsai_BlockB1.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
-    hsai_BlockB1.Init.MonoStereoMode = SAI_STEREOMODE;
-    hsai_BlockB1.Init.CompandingMode = SAI_NOCOMPANDING;
-    hsai_BlockB1.Init.TriState = SAI_OUTPUT_NOTRELEASED;
-    hsai_BlockB1.Init.PdmInit.Activation = DISABLE;
-    hsai_BlockB1.Init.PdmInit.MicPairsNbr = 1;
-    hsai_BlockB1.Init.PdmInit.ClockEnable = SAI_PDM_CLOCK1_ENABLE;
-    hsai_BlockB1.FrameInit.FrameLength = 32;
-    hsai_BlockB1.FrameInit.ActiveFrameLength = 1;
-    hsai_BlockB1.FrameInit.FSDefinition = SAI_FS_STARTFRAME;
-    hsai_BlockB1.FrameInit.FSPolarity = SAI_FS_ACTIVE_HIGH;
-    hsai_BlockB1.FrameInit.FSOffset = SAI_FS_FIRSTBIT;
-    hsai_BlockB1.SlotInit.FirstBitOffset = 0;
-    hsai_BlockB1.SlotInit.SlotSize = SAI_SLOTSIZE_DATASIZE;
-    hsai_BlockB1.SlotInit.SlotNumber = 2;
-    hsai_BlockB1.SlotInit.SlotActive = 0x0000FFFF;
-    // if (HAL_SAI_DeInit(&hsai_BlockB1) != HAL_OK)
-    // {
-    //     printf("error deinit sai b");
-    // }
     __HAL_RCC_SAI1_CLK_ENABLE();
-    if (HAL_AUDIO_INIT(&hsai_BlockB1) != HAL_OK)
-    {
-        printf("error init sai b");
-    }
-
-    GPIO_InitTypeDef GPIO_InitStruct;
-    // HAL_GPIO_DeInit(GPIOE, GPIO_PIN_5|GPIO_PIN_4);
-    // HAL_GPIO_DeInit(GPIOB, GPIO_PIN_2);
-    // HAL_GPIO_DeInit(GPIOE, GPIO_PIN_3);
-    __HAL_RCC_GPIOE_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    /**SAI1_A_Block_A GPIO Configuration
-     PE5     ------> SAI1_SCK_A
-    PE4     ------> SAI1_FS_A
-    PB2     ------> SAI1_SD_A
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_4;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
-    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = GPIO_PIN_2;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
-    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-        /**SAI1_B_Block_B GPIO Configuration
-     PE3     ------> SAI1_SD_B
-    */
-    GPIO_InitStruct.Pin = GPIO_PIN_3;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
-    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
     i2s_obj->i2s.Instance = AUDIO_INSTANCE_1;
     i2s_obj->tx_dma_descr = &dma_I2S_2_TX;    
     #else
