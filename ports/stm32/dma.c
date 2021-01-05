@@ -117,7 +117,7 @@ static const DMA_InitTypeDef dma_init_struct_i2s = {
     .Priority = DMA_PRIORITY_LOW,
     .FIFOMode = DMA_FIFOMODE_DISABLE
 };
-#elif
+#else
 static const DMA_InitTypeDef dma_init_struct_i2s = {
     #if defined(STM32F4) || defined(STM32F7)
     .Channel = 0,

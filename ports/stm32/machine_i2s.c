@@ -663,7 +663,7 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
     i2s_obj->tx_dma_descr = &dma_I2S_2_TX;
 
     if (HAL_SAI_Init(&i2s_obj->i2s) == HAL_OK) {    
-    #elif
+    #else
     if (HAL_I2S_Init(&i2s_obj->i2s) == HAL_OK) {
     #endif
         // Reset and initialize Tx and Rx DMA channels
@@ -808,7 +808,7 @@ void AUDIO_TXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     // safe to fill the top  half while the bottom half of buffer is being emptied
     machine_i2s_feed_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
 }
-#elif
+#else
 void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s) {
     uint32_t errorCode = HAL_I2S_GetError(hi2s);
     printf("I2S Error = %ld\n", errorCode);
@@ -1348,7 +1348,7 @@ STATIC mp_obj_t machine_i2s_deinit(mp_obj_t self_in) {
         dma_deinit(self->rx_dma_descr);
         #if defined (USE_SAI)
         HAL_SAI_DeInit(&self->i2s);
-        #elif
+        #else
         HAL_I2S_DeInit(&self->i2s);
         #endif
         self->used = false;
@@ -1356,7 +1356,7 @@ STATIC mp_obj_t machine_i2s_deinit(mp_obj_t self_in) {
     
     #if defined (USE_SAI)
         __HAL_RCC_SAI1_CLK_DISABLE();
-    #elif
+    #else
     if (self->i2s.Instance == I2S1) {
         __SPI1_FORCE_RESET();
         __SPI1_RELEASE_RESET();
