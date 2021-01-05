@@ -29,7 +29,7 @@
                     "-j4",
                     "BOARD=ELITEBOARD_H743XI",
                     "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
-                    "DEBUG=0"
+                    "DEBUG=1"
                 ]
             },
             "osx": {
