@@ -32,6 +32,11 @@ _heap_end = _sstack;
 /* Define output sections */
 SECTIONS
 {
+    .dma_buffer : /* Space before ':' is critical */
+    {
+        *(.dma_buffer)
+    } >RAM_D2
+
     .eth_buffers (NOLOAD) : {
         . = ABSOLUTE(0x30040000);
         *eth.o*(.bss.eth_dma)
