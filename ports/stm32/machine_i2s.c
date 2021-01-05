@@ -42,6 +42,7 @@
 #include "bufhelper.h"
 #include "modmachine.h"
 #include "led.h" // For debugging using led_toggle(n)
+#include "mpu.h"
 
 // Pyboard V1.0/V1.1:   Two standard I2S interfaces (multiplexed with SPI2 and SPI3) are available
 // Pyboard D SF2W, SF3W:  Three standard I2S interfaces (multiplexed with SPI1, SPI2 and SPI3) are available
@@ -81,10 +82,24 @@
 // SPI3 RX:     DMA1_Stream0.CHANNEL_0 or DMA1_Stream2.CHANNEL_0
 // SPI3 TX:     DMA1_Stream5.CHANNEL_0 or DMA1_Stream7.CHANNEL_0
 
+#define AUDIO_HANDLE_TYPEDEF SAI_HandleTypeDef
+#define AUDIO_TXHALFCPLTCALLBACK HAL_SAI_TxHalfCpltCallback
+#define AUDIO_TXCPLTCALLBACK HAL_SAI_TxCpltCallback
+#define AUDIO_RXHALFCPLTCALLBACK HAL_SAI_RxHalfCpltCallback
+#define AUDIO_RXCPLTCALLBACK HAL_SAI_RxCpltCallback
+#define AUDIO_ERRORCALLBACK HAL_SAI_ErrorCallback
+#define AUDIO_GETERROR HAL_SAI_GetError
+
+SAI_HandleTypeDef hsai_BlockA1;
+SAI_HandleTypeDef hsai_BlockB1;
+
 #define MEASURE_COPY_PERFORMANCE 1
 
 #define SIZEOF_DMA_BUFFER_IN_BYTES (256)  // TODO what is the minimal size for acceptable performance
 #define QUEUE_CAPACITY (10)
+
+#define DMA_BUFFER __attribute__((section(".dma_buffer"))) //__attribute__ ((aligned (4)))
+DMA_BUFFER static uint8_t dma_buffer_reini[SIZEOF_DMA_BUFFER_IN_BYTES];
 
 typedef enum {
     TOP_HALF    = 0,
@@ -106,7 +121,7 @@ typedef struct _machine_i2s_queue_t {
 typedef struct _machine_i2s_obj_t {
     mp_obj_base_t           base;
     mp_int_t                i2s_id;
-    I2S_HandleTypeDef       i2s;
+    AUDIO_HANDLE_TYPEDEF    i2s;
     const dma_descr_t       *tx_dma_descr;
     const dma_descr_t       *rx_dma_descr; 
     DMA_HandleTypeDef       tx_dma;
@@ -116,7 +131,7 @@ typedef struct _machine_i2s_obj_t {
     uint32_t                active_buffer_index;
     machine_i2s_queue_t     active_queue;
     machine_i2s_queue_t     idle_queue;
-    uint8_t                 dma_buffer[SIZEOF_DMA_BUFFER_IN_BYTES];
+    uint8_t                 *dma_buffer;//[SIZEOF_DMA_BUFFER_IN_BYTES];
     pin_obj_t               *sck;
     pin_obj_t               *ws;
     pin_obj_t               *sd;
@@ -338,6 +353,7 @@ STATIC void machine_i2s_feed_dma(machine_i2s_obj_t *self, machine_i2s_dma_buffer
             // no samples to 
             // TODO (?) fill dma buffer with zeros as there was no sample data to fill it
             // this would produce silence audio when no more sample data is available
+            printf("Received no new data and ran out of buffers. DMA won't be updated!");
             return;
         }
     }
@@ -357,7 +373,8 @@ STATIC void machine_i2s_feed_dma(machine_i2s_obj_t *self, machine_i2s_dma_buffer
     
     if ((self->format == MONO) && (self->bits == I2S_DATAFORMAT_16B)) {
         uint32_t samples_to_copy = SIZEOF_DMA_BUFFER_IN_BYTES/2/4; // TODO - really confusing -- fix
-        uint16_t *dma_buffer_p = (uint16_t *)&self->dma_buffer[dma_buffer_index];
+        uint16_t *dma_buffer_p_tmp = (uint16_t *)self->dma_buffer;
+        uint16_t *dma_buffer_p = &dma_buffer_p_tmp[dma_buffer_index];
 
         uint8_t *temp = (uint8_t *)bufinfo.buf;
         uint8_t *temp2 = &temp[self->active_buffer_index];
@@ -371,7 +388,8 @@ STATIC void machine_i2s_feed_dma(machine_i2s_obj_t *self, machine_i2s_dma_buffer
         
     } else if ((self->format == MONO) && (self->bits == I2S_DATAFORMAT_32B)) {
         uint32_t samples_to_copy = SIZEOF_DMA_BUFFER_IN_BYTES/2/8;
-        uint32_t *dma_buffer_p = (uint32_t *)&self->dma_buffer[dma_buffer_index];
+        uint32_t *dma_buffer_p_tmp = (uint32_t *)self->dma_buffer;
+        uint32_t *dma_buffer_p = &dma_buffer_p_tmp[dma_buffer_index];
         
         uint8_t *temp = (uint8_t *)bufinfo.buf;
         uint8_t *temp2 = &temp[self->active_buffer_index];
@@ -384,8 +402,15 @@ STATIC void machine_i2s_feed_dma(machine_i2s_obj_t *self, machine_i2s_dma_buffer
         self->active_buffer_index += SIZEOF_DMA_BUFFER_IN_BYTES/2/2;
         
     } else { // STEREO, both 16-bit and 32-bit
-        memcpy(&self->dma_buffer[dma_buffer_index], 
-               &((uint8_t *)bufinfo.buf)[self->active_buffer_index], 
+        uint8_t *dma_buffer_p_tmp = self->dma_buffer;
+        uint8_t *dma_buffer_p = &dma_buffer_p_tmp[dma_buffer_index];
+        
+        uint8_t *temp = (uint8_t *)bufinfo.buf;
+        uint8_t *temp2 = &temp[self->active_buffer_index];
+        uint8_t *active_buffer_p = (uint8_t *)temp2;
+        
+        memcpy(dma_buffer_p,  
+               active_buffer_p, 
                SIZEOF_DMA_BUFFER_IN_BYTES/2);
         
         self->active_buffer_index += SIZEOF_DMA_BUFFER_IN_BYTES/2;
@@ -394,7 +419,8 @@ STATIC void machine_i2s_feed_dma(machine_i2s_obj_t *self, machine_i2s_dma_buffer
     // 32 bit samples need to be reformatted to match STM32 HAL API requirements for I2S
     // TODO  SIZEOF_DMA_BUFFER_IN_BYTES/2  <--- make a macro for this
     if (self->bits == I2S_DATAFORMAT_32B) {
-        machine_i2s_reformat_32_bit_samples((int32_t *)&self->dma_buffer[dma_buffer_index], SIZEOF_DMA_BUFFER_IN_BYTES/2/4);
+        uint8_t *dma_buffer_p_tmp = self->dma_buffer;
+        machine_i2s_reformat_32_bit_samples((int32_t *)(&dma_buffer_p_tmp[dma_buffer_index]), SIZEOF_DMA_BUFFER_IN_BYTES/2/4);
     }
     
     // has active buffer been emptied?
@@ -432,6 +458,8 @@ static void led_flash_info(int colour, int count) {
 
 // assumes init parameters are set up correctly
 STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
+    #if defined (USE_SAI)
+    #else
     // init the GPIO lines
     GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
@@ -491,6 +519,7 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
         GPIO_InitStructure.Alternate = (uint8_t)af->idx;
         HAL_GPIO_Init(i2s_obj->sd->gpio, &GPIO_InitStructure);
     }
+    #endif
 
     // Configure and enable I2SPLL - I2S_MASTER modes only:
     // ====================================================
@@ -531,11 +560,112 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
         __HAL_RCC_PLLI2S_ENABLE();
 #elif defined (STM32F767xx)
 #error I2S not yet supported on the STM32F767xx processor (future)
+#elif defined (USE_SAI)
+
 #else
 #error I2S does not support this processor
 #endif // STM32F405xx
 
+    #if defined (USE_SAI)
+    __HAL_RCC_SAI1_CLK_DISABLE();
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SAI1;
+    PeriphClkInitStruct.Sai1ClockSelection = RCC_SAI1CLKSOURCE_PLL;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+        printf("error periph clk config");
+    }
+    
+    hsai_BlockB1.Instance = SAI1_Block_B;
+    hsai_BlockB1.Init.Protocol = SAI_FREE_PROTOCOL;
+    hsai_BlockB1.Init.AudioMode = SAI_MODESLAVE_TX;
+    hsai_BlockB1.Init.DataSize = SAI_DATASIZE_16;
+    hsai_BlockB1.Init.FirstBit = SAI_FIRSTBIT_MSB;
+    hsai_BlockB1.Init.ClockStrobing = SAI_CLOCKSTROBING_FALLINGEDGE;
+    hsai_BlockB1.Init.Synchro = SAI_SYNCHRONOUS;
+    hsai_BlockB1.Init.OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
+    hsai_BlockB1.Init.FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
+    hsai_BlockB1.Init.SynchroExt = SAI_SYNCEXT_DISABLE;
+    hsai_BlockB1.Init.MonoStereoMode = SAI_STEREOMODE;
+    hsai_BlockB1.Init.CompandingMode = SAI_NOCOMPANDING;
+    hsai_BlockB1.Init.TriState = SAI_OUTPUT_NOTRELEASED;
+    hsai_BlockB1.Init.PdmInit.Activation = DISABLE;
+    hsai_BlockB1.Init.PdmInit.MicPairsNbr = 1;
+    hsai_BlockB1.Init.PdmInit.ClockEnable = SAI_PDM_CLOCK1_ENABLE;
+    hsai_BlockB1.FrameInit.FrameLength = 32;
+    hsai_BlockB1.FrameInit.ActiveFrameLength = 1;
+    hsai_BlockB1.FrameInit.FSDefinition = SAI_FS_STARTFRAME;
+    hsai_BlockB1.FrameInit.FSPolarity = SAI_FS_ACTIVE_HIGH;
+    hsai_BlockB1.FrameInit.FSOffset = SAI_FS_FIRSTBIT;
+    hsai_BlockB1.SlotInit.FirstBitOffset = 0;
+    hsai_BlockB1.SlotInit.SlotSize = SAI_SLOTSIZE_DATASIZE;
+    hsai_BlockB1.SlotInit.SlotNumber = 2;
+    hsai_BlockB1.SlotInit.SlotActive = 0x0000FFFF;
+    // if (HAL_SAI_DeInit(&hsai_BlockB1) != HAL_OK)
+    // {
+    //     printf("error deinit sai b");
+    // }
+    __HAL_RCC_SAI1_CLK_ENABLE();
+    if (HAL_SAI_Init(&hsai_BlockB1) != HAL_OK)
+    {
+        printf("error init sai b");
+    }
+
+    GPIO_InitTypeDef GPIO_InitStruct;
+    // HAL_GPIO_DeInit(GPIOE, GPIO_PIN_5|GPIO_PIN_4);
+    // HAL_GPIO_DeInit(GPIOB, GPIO_PIN_2);
+    // HAL_GPIO_DeInit(GPIOE, GPIO_PIN_3);
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**SAI1_A_Block_A GPIO Configuration
+     PE5     ------> SAI1_SCK_A
+    PE4     ------> SAI1_FS_A
+    PB2     ------> SAI1_SD_A
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_4;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+        /**SAI1_B_Block_B GPIO Configuration
+     PE3     ------> SAI1_SD_B
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+
+    // uint16_t dac_buffer[256];
+    // for(uint16_t cnt=0; cnt < 256; cnt++)
+    //     dac_buffer[cnt]=1000*(cnt%50);
+
+    // HAL_StatusTypeDef status = HAL_OK;
+    // while(1)
+    // {
+    //     status = HAL_SAI_Transmit(&hsai_BlockB1, (uint8_t*)&dac_buffer[0], 256, 1000);
+    //     if(status != HAL_OK)
+    //     status = HAL_OK;
+    // }
+
+    i2s_obj->i2s.Instance = SAI1_Block_B;
+    i2s_obj->tx_dma_descr = &dma_I2S_2_TX;
+
+    if (HAL_SAI_Init(&i2s_obj->i2s) == HAL_OK) {    
+    #elif
     if (HAL_I2S_Init(&i2s_obj->i2s) == HAL_OK) {
+    #endif
         // Reset and initialize Tx and Rx DMA channels
 
         if (i2s_obj->mode == I2S_MODE_MASTER_RX) {
@@ -616,6 +746,69 @@ void i2s_deinit(void) {
 }
 #endif
 
+#ifdef USE_SAI
+void AUDIO_ERRORCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
+    uint32_t errorCode = AUDIO_GETERROR(hi2s);
+    printf("Audio Error = %ld\n", errorCode);
+}
+
+void AUDIO_RXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
+    machine_i2s_obj_t *self;
+    if (hi2s->Instance == SAI1_Block_B) {
+        self = &(machine_i2s_obj)[0];
+    } else {
+        self = &(machine_i2s_obj)[1];
+    }
+    
+    // bottom half of buffer now filled, 
+    // safe to empty the bottom half while the top half of buffer is being filled
+    machine_i2s_empty_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
+}     
+    
+void AUDIO_RXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
+    //printf("in rx half cplt callback");
+    machine_i2s_obj_t *self;
+    if (hi2s->Instance == SAI1_Block_B) {
+        self = &(machine_i2s_obj)[0];
+    } else {
+        self = &(machine_i2s_obj)[1];
+    }
+    
+    
+    // top half of buffer now filled, 
+    // safe to empty the top  half while the bottom half of buffer is being filled
+    machine_i2s_empty_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
+}
+
+void AUDIO_TXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
+    //printf("in tx cplt callback");
+    machine_i2s_obj_t *self;
+    if (hi2s->Instance == SAI1_Block_B) {
+        self = &(machine_i2s_obj)[0];
+    } else {
+        self = &(machine_i2s_obj)[1];
+    }
+    // HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
+    // mp_hal_delay_us(10);
+    // HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
+    // bottom half of buffer now emptied, 
+    // safe to fill the bottom half while the top half of buffer is being emptied
+    machine_i2s_feed_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
+}
+
+void AUDIO_TXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
+    machine_i2s_obj_t *self;
+    if (hi2s->Instance == SAI1_Block_B) {
+        self = &(machine_i2s_obj)[0];
+    } else {
+        self = &(machine_i2s_obj)[1];
+    }
+    
+    // top half of buffer now emptied, 
+    // safe to fill the top  half while the bottom half of buffer is being emptied
+    machine_i2s_feed_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
+}
+#elif
 void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s) {
     uint32_t errorCode = HAL_I2S_GetError(hi2s);
     printf("I2S Error = %ld\n", errorCode);
@@ -673,6 +866,7 @@ void HAL_I2S_TxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
     // safe to fill the top  half while the bottom half of buffer is being emptied
     machine_i2s_feed_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
 }
+#endif
 
 STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 
@@ -720,30 +914,30 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     if (mp_obj_is_type(args[ARG_sck].u_obj, &pin_type)) {
         pin_af = pin_find_af(args[ARG_sck].u_obj, AF_FN_I2S, self->i2s_id);
         if (pin_af->type != AF_PIN_TYPE_I2S_CK) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SCK pin for I2S%d"), self->i2s_id);
+            //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SCK pin for I2S%d"), self->i2s_id);
         }
     } else {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SCK not a Pin type"));
+        //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SCK not a Pin type"));
     }
     
     // is WS valid?
     if (mp_obj_is_type(args[ARG_ws].u_obj, &pin_type)) {
         pin_af = pin_find_af(args[ARG_ws].u_obj, AF_FN_I2S, self->i2s_id);
         if (pin_af->type != AF_PIN_TYPE_I2S_WS) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid WS pin for I2S%d"), self->i2s_id);
+            //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid WS pin for I2S%d"), self->i2s_id);
         }
     } else {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("WS not a Pin type"));
+        //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("WS not a Pin type"));
     }
     
     // is SD valid?
     if (mp_obj_is_type(args[ARG_sd].u_obj, &pin_type)) {
         pin_af = pin_find_af(args[ARG_sd].u_obj, AF_FN_I2S, self->i2s_id);
         if (pin_af->type != AF_PIN_TYPE_I2S_SD) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SD pin for I2S%d"), self->i2s_id);
+            //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SD pin for I2S%d"), self->i2s_id);
         }
     } else {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SD not a Pin type"));
+        //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SD not a Pin type"));
     }
 
     // is Mode valid?
@@ -756,8 +950,8 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     // is Bits valid?
     int8_t i2s_bits_per_sample = -1;
     // TODO add 24 bits -- audio folks will expect to see this
-    if (args[ARG_bits].u_int == 16) { i2s_bits_per_sample = I2S_DATAFORMAT_16B; }
-    else if (args[ARG_bits].u_int == 32) { i2s_bits_per_sample = I2S_DATAFORMAT_32B; }
+    if (args[ARG_bits].u_int == 16) { i2s_bits_per_sample = (int8_t)I2S_DATAFORMAT_16B; }
+    else if (args[ARG_bits].u_int == 32) { i2s_bits_per_sample = (int8_t)I2S_DATAFORMAT_32B; }
     else { 
         mp_raise_ValueError(MP_ERROR_TEXT("Bits is not valid"));
     }
@@ -801,6 +995,8 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     //printf("callable = %d\n", mp_obj_is_callable(args[ARG_callback].u_obj));  // TODO test with no callback
     // TODO raise exception if callback is bogus ?
     
+    (*self).dma_buffer = &dma_buffer_reini[0];
+
     self->sck = args[ARG_sck].u_obj;
     self->ws = args[ARG_ws].u_obj;
     self->sd = args[ARG_sd].u_obj;
@@ -809,7 +1005,36 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     self->format = i2s_format;
     self->rate = args[ARG_rate].u_int;
     self->callback = args[ARG_callback].u_obj;
-    
+
+    #if defined (USE_SAI)
+    SAI_InitTypeDef *init = &self->i2s.Init;
+    SAI_FrameInitTypeDef *frameinit = &self->i2s.FrameInit;
+    SAI_SlotInitTypeDef *slotinit = &self->i2s.SlotInit;
+    init->Protocol = SAI_FREE_PROTOCOL;
+    init->AudioMode = SAI_MODESLAVE_TX;
+    init->DataSize = SAI_DATASIZE_16;
+    init->FirstBit = SAI_FIRSTBIT_MSB;
+    init->ClockStrobing = SAI_CLOCKSTROBING_FALLINGEDGE;
+    init->Synchro = SAI_SYNCHRONOUS;
+    init->OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
+    init->FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
+    init->SynchroExt = SAI_SYNCEXT_DISABLE;
+    init->MonoStereoMode = SAI_STEREOMODE;
+    init->CompandingMode = SAI_NOCOMPANDING;
+    init->TriState = SAI_OUTPUT_NOTRELEASED;
+    init->PdmInit.Activation = DISABLE;
+    init->PdmInit.MicPairsNbr = 1;
+    init->PdmInit.ClockEnable = SAI_PDM_CLOCK1_ENABLE;
+    frameinit->FrameLength = 32;
+    frameinit->ActiveFrameLength = 1;
+    frameinit->FSDefinition = SAI_FS_STARTFRAME;
+    frameinit->FSPolarity = SAI_FS_ACTIVE_HIGH;
+    frameinit->FSOffset = SAI_FS_FIRSTBIT;
+    slotinit->FirstBitOffset = 0;
+    slotinit->SlotSize = SAI_SLOTSIZE_DATASIZE;
+    slotinit->SlotNumber = 2;
+    slotinit->SlotActive = 0x0000FFFF;
+    #else
     I2S_InitTypeDef *init = &self->i2s.Init;
     init->Mode = i2s_mode;
     init->Standard   = I2S_STANDARD_PHILIPS;
@@ -818,6 +1043,7 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     init->AudioFreq  = args[ARG_rate].u_int;
     init->CPOL       = I2S_CPOL_LOW;
     init->ClockSource = I2S_CLOCK_PLL; 
+    #endif
     
     // init the I2S bus
     if (!i2s_init(self)) {
@@ -1066,11 +1292,43 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
     HAL_StatusTypeDef status;
 
     if (self->mode == I2S_MODE_MASTER_TX) {
+        #if defined (USE_SAI)
+        // Configure MPU
+        uint32_t irq_state = mpu_config_start();
+        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_reini[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
+        mpu_config_end(irq_state);
+        #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?
         machine_i2s_feed_dma(self, BOTTOM_HALF);
+        #if defined (USE_SAI)
+        printf("Call HAL_SAI_Transmit_DMA\n");
+        status = HAL_OK;
+        GPIO_InitTypeDef GPIO_InitStruct;
+        __HAL_RCC_GPIOJ_CLK_ENABLE();
+        HAL_GPIO_WritePin(GPIOJ, GPIO_PIN_8, GPIO_PIN_RESET);
+        GPIO_InitStruct.Pin = GPIO_PIN_8;
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        HAL_GPIO_Init(GPIOJ, &GPIO_InitStruct);
+        __HAL_RCC_GPIOE_CLK_ENABLE();
+        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_RESET);
+        GPIO_InitStruct.Pin = GPIO_PIN_0;
+        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+        HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+        status = HAL_SAI_Transmit_DMA(&self->i2s, (void *)self->dma_buffer, SIZEOF_DMA_BUFFER_IN_BYTES / 2);
+        #else
         status = HAL_I2S_Transmit_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
+        #endif
     } else {  // RX
+        #if defined (USE_SAI)        
+        status = HAL_SAI_Receive_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
+        #else
         status = HAL_I2S_Receive_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
+        #endif
     }
 
     if (status != HAL_OK) {
@@ -1088,10 +1346,17 @@ STATIC mp_obj_t machine_i2s_deinit(mp_obj_t self_in) {
     if (self->used) {
         dma_deinit(self->tx_dma_descr);
         dma_deinit(self->rx_dma_descr);
+        #if defined (USE_SAI)
+        HAL_SAI_DeInit(&self->i2s);
+        #elif
         HAL_I2S_DeInit(&self->i2s);
+        #endif
         self->used = false;
     }
     
+    #if defined (USE_SAI)
+        __HAL_RCC_SAI1_CLK_DISABLE();
+    #elif
     if (self->i2s.Instance == I2S1) {
         __SPI1_FORCE_RESET();
         __SPI1_RELEASE_RESET();
@@ -1101,6 +1366,7 @@ STATIC mp_obj_t machine_i2s_deinit(mp_obj_t self_in) {
         __SPI2_RELEASE_RESET();
         __SPI2_CLK_DISABLE();
     }
+    #endif
 
     return mp_const_none;
 }
