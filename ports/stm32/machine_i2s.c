@@ -105,7 +105,7 @@ SAI_HandleTypeDef hsai_BlockB1;
 #define QUEUE_CAPACITY (10)
 
 #define DMA_BUFFER __attribute__((section(".dma_buffer"))) //__attribute__ ((aligned (4)))
-DMA_BUFFER static uint8_t dma_buffer_reini[SIZEOF_DMA_BUFFER_IN_BYTES];
+DMA_BUFFER static uint8_t dma_buffer_audio[SIZEOF_DMA_BUFFER_IN_BYTES];
 
 typedef enum {
     TOP_HALF    = 0,
@@ -920,7 +920,7 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     //printf("callable = %d\n", mp_obj_is_callable(args[ARG_callback].u_obj));  // TODO test with no callback
     // TODO raise exception if callback is bogus ?
     
-    (*self).dma_buffer = &dma_buffer_reini[0];
+    (*self).dma_buffer = &dma_buffer_audio[0];
 
     self->sck = args[ARG_sck].u_obj;
     self->ws = args[ARG_ws].u_obj;
@@ -1220,7 +1220,7 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
         #if defined (USE_SAI)
         // Configure MPU
         uint32_t irq_state = mpu_config_start();
-        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_reini[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
+        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_audio[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
         mpu_config_end(irq_state);
         #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?
