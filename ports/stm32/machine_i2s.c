@@ -89,6 +89,12 @@
 #define AUDIO_RXCPLTCALLBACK HAL_SAI_RxCpltCallback
 #define AUDIO_ERRORCALLBACK HAL_SAI_ErrorCallback
 #define AUDIO_GETERROR HAL_SAI_GetError
+#define HAL_AUDIO_INIT HAL_SAI_Init
+#define HAL_AUDIO_DEINIT HAL_SAI_DeInit
+#define AUDIO_TX_DMA HAL_SAI_Transmit_DMA
+#define AUDIO_RX_DMA HAL_SAI_Receive_DMA
+#define AUDIO_INSTANCE_1 SAI1_Block_B  //I2S1
+#define AUDIO_INSTANCE_2 SAI1_Block_A
 
 SAI_HandleTypeDef hsai_BlockA1;
 SAI_HandleTypeDef hsai_BlockB1;
@@ -606,7 +612,7 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
     //     printf("error deinit sai b");
     // }
     __HAL_RCC_SAI1_CLK_ENABLE();
-    if (HAL_SAI_Init(&hsai_BlockB1) != HAL_OK)
+    if (HAL_AUDIO_INIT(&hsai_BlockB1) != HAL_OK)
     {
         printf("error init sai b");
     }
@@ -646,26 +652,12 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
     GPIO_InitStruct.Alternate = GPIO_AF6_SAI1;
     HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-
-    // uint16_t dac_buffer[256];
-    // for(uint16_t cnt=0; cnt < 256; cnt++)
-    //     dac_buffer[cnt]=1000*(cnt%50);
-
-    // HAL_StatusTypeDef status = HAL_OK;
-    // while(1)
-    // {
-    //     status = HAL_SAI_Transmit(&hsai_BlockB1, (uint8_t*)&dac_buffer[0], 256, 1000);
-    //     if(status != HAL_OK)
-    //     status = HAL_OK;
-    // }
-
-    i2s_obj->i2s.Instance = SAI1_Block_B;
-    i2s_obj->tx_dma_descr = &dma_I2S_2_TX;
-
-    if (HAL_SAI_Init(&i2s_obj->i2s) == HAL_OK) {    
+    i2s_obj->i2s.Instance = AUDIO_INSTANCE_1;
+    i2s_obj->tx_dma_descr = &dma_I2S_2_TX;    
     #else
-    if (HAL_I2S_Init(&i2s_obj->i2s) == HAL_OK) {
+    
     #endif
+    if (HAL_AUDIO_INIT(&i2s_obj->i2s) == HAL_OK) {
         // Reset and initialize Tx and Rx DMA channels
 
         if (i2s_obj->mode == I2S_MODE_MASTER_RX) {
@@ -746,7 +738,6 @@ void i2s_deinit(void) {
 }
 #endif
 
-#ifdef USE_SAI
 void AUDIO_ERRORCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     uint32_t errorCode = AUDIO_GETERROR(hi2s);
     printf("Audio Error = %ld\n", errorCode);
@@ -754,12 +745,11 @@ void AUDIO_ERRORCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 
 void AUDIO_RXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == SAI1_Block_B) {
+    if (hi2s->Instance == AUDIO_INSTANCE_1) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
     }
-    
     // bottom half of buffer now filled, 
     // safe to empty the bottom half while the top half of buffer is being filled
     machine_i2s_empty_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
@@ -768,13 +758,11 @@ void AUDIO_RXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 void AUDIO_RXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     //printf("in rx half cplt callback");
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == SAI1_Block_B) {
+    if (hi2s->Instance == AUDIO_INSTANCE_1) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
     }
-    
-    
     // top half of buffer now filled, 
     // safe to empty the top  half while the bottom half of buffer is being filled
     machine_i2s_empty_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
@@ -783,14 +771,11 @@ void AUDIO_RXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 void AUDIO_TXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     //printf("in tx cplt callback");
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == SAI1_Block_B) {
+    if (hi2s->Instance == AUDIO_INSTANCE_1) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
     }
-    // HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
-    // mp_hal_delay_us(10);
-    // HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
     // bottom half of buffer now emptied, 
     // safe to fill the bottom half while the top half of buffer is being emptied
     machine_i2s_feed_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
@@ -798,75 +783,15 @@ void AUDIO_TXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 
 void AUDIO_TXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == SAI1_Block_B) {
+    if (hi2s->Instance == AUDIO_INSTANCE_1) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
-    }
-    
+    }    
     // top half of buffer now emptied, 
     // safe to fill the top  half while the bottom half of buffer is being emptied
     machine_i2s_feed_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
 }
-#else
-void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s) {
-    uint32_t errorCode = HAL_I2S_GetError(hi2s);
-    printf("I2S Error = %ld\n", errorCode);
-}
-
-void HAL_I2S_RxCpltCallback(I2S_HandleTypeDef *hi2s) {
-    machine_i2s_obj_t *self;
-    if (hi2s->Instance == I2S1) {
-        self = &(machine_i2s_obj)[0];
-    } else {
-        self = &(machine_i2s_obj)[1];
-    }
-    
-    // bottom half of buffer now filled, 
-    // safe to empty the bottom half while the top half of buffer is being filled
-    machine_i2s_empty_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
-}     
-    
-void HAL_I2S_RxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
-    machine_i2s_obj_t *self;
-    if (hi2s->Instance == I2S1) {
-        self = &(machine_i2s_obj)[0];
-    } else {
-        self = &(machine_i2s_obj)[1];
-    }
-    
-    
-    // top half of buffer now filled, 
-    // safe to empty the top  half while the bottom half of buffer is being filled
-    machine_i2s_empty_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
-}
-
-void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s) {
-    machine_i2s_obj_t *self;
-    if (hi2s->Instance == I2S1) {
-        self = &(machine_i2s_obj)[0];
-    } else {
-        self = &(machine_i2s_obj)[1];
-    }
-    
-    // bottom half of buffer now emptied, 
-    // safe to fill the bottom half while the top half of buffer is being emptied
-    machine_i2s_feed_dma(self, BOTTOM_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
-}
-
-void HAL_I2S_TxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
-    machine_i2s_obj_t *self;
-    if (hi2s->Instance == I2S1) {
-        self = &(machine_i2s_obj)[0];
-    } else {
-        self = &(machine_i2s_obj)[1];
-    }
-    
-    // top half of buffer now emptied, 
-    // safe to fill the top  half while the bottom half of buffer is being emptied
-    machine_i2s_feed_dma(self, TOP_HALF);  // TODO check with =S= vs uPy coding rules.  is machine_i2s prefix really needed for STATIC?
-}
-#endif
 
 STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
 
@@ -1300,35 +1225,9 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
         #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?
         machine_i2s_feed_dma(self, BOTTOM_HALF);
-        #if defined (USE_SAI)
-        printf("Call HAL_SAI_Transmit_DMA\n");
-        status = HAL_OK;
-        GPIO_InitTypeDef GPIO_InitStruct;
-        __HAL_RCC_GPIOJ_CLK_ENABLE();
-        HAL_GPIO_WritePin(GPIOJ, GPIO_PIN_8, GPIO_PIN_RESET);
-        GPIO_InitStruct.Pin = GPIO_PIN_8;
-        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-        GPIO_InitStruct.Pull = GPIO_NOPULL;
-        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-        HAL_GPIO_Init(GPIOJ, &GPIO_InitStruct);
-        __HAL_RCC_GPIOE_CLK_ENABLE();
-        HAL_GPIO_WritePin(GPIOE, GPIO_PIN_0, GPIO_PIN_RESET);
-        GPIO_InitStruct.Pin = GPIO_PIN_0;
-        GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-        GPIO_InitStruct.Pull = GPIO_NOPULL;
-        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-        HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
-        status = HAL_SAI_Transmit_DMA(&self->i2s, (void *)self->dma_buffer, SIZEOF_DMA_BUFFER_IN_BYTES / 2);
-        #else
-        status = HAL_I2S_Transmit_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
-        #endif
-    } else {  // RX
-        #if defined (USE_SAI)        
-        status = HAL_SAI_Receive_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
-        #else
-        status = HAL_I2S_Receive_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
-        #endif
+        status = AUDIO_TX_DMA(&self->i2s, (void *)self->dma_buffer, SIZEOF_DMA_BUFFER_IN_BYTES / 2);
+    } else {  // RX      
+        status = AUDIO_RX_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);        
     }
 
     if (status != HAL_OK) {
@@ -1346,11 +1245,7 @@ STATIC mp_obj_t machine_i2s_deinit(mp_obj_t self_in) {
     if (self->used) {
         dma_deinit(self->tx_dma_descr);
         dma_deinit(self->rx_dma_descr);
-        #if defined (USE_SAI)
-        HAL_SAI_DeInit(&self->i2s);
-        #else
-        HAL_I2S_DeInit(&self->i2s);
-        #endif
+        HAL_AUDIO_DEINIT(&self->i2s);
         self->used = false;
     }
     
