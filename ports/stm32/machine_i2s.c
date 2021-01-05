@@ -1225,7 +1225,7 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
         #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?
         machine_i2s_feed_dma(self, BOTTOM_HALF);
-        status = AUDIO_TX_DMA(&self->i2s, (void *)self->dma_buffer, SIZEOF_DMA_BUFFER_IN_BYTES / 2);
+        status = AUDIO_TX_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);
     } else {  // RX      
         status = AUDIO_RX_DMA(&self->i2s, (void *)self->dma_buffer, number_of_samples);        
     }
