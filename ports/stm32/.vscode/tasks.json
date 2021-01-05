@@ -87,7 +87,6 @@
                     "BOARD=ELITEBOARD_H743XI",
                     "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
                     "DEBUG=0",
-                    "FROZEN_MANIFEST=./boards/ELITEBOARD_H743XI/manifest.py",
                     "clean"
                 ]
             },
@@ -99,7 +98,6 @@
                     "BOARD=ELITEBOARD_H743XI",
                     "CROSS_COMPILE=$ELITEBOARDDIR/gcc/bin/arm-none-eabi-",
                     "DEBUG=0",
-                    "FROZEN_MANIFEST=./boards/ELITEBOARD_H743XI/manifest.py",
                     "clean"
                 ]
 			},
