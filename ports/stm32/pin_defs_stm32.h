@@ -100,7 +100,10 @@ enum {
     AF_PIN_TYPE_CAN_TX,
     AF_PIN_TYPE_CAN_RX,
 
-    AF_PIN_TYPE_SAI_CK,
+    AF_PIN_TYPE_SAI_SCK_A,
+    AF_PIN_TYPE_SAI_FS_A,
+    AF_PIN_TYPE_SAI_SD_A,
+    AF_PIN_TYPE_SAI_SD_B,
 };
 
 // The HAL uses a slightly different naming than we chose, so we provide

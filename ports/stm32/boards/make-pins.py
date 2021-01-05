@@ -17,7 +17,7 @@ SUPPORTED_FN = {
     "SPI": ["NSS", "SCK", "MISO", "MOSI"],
     "SDMMC": ["CK", "CMD", "D0", "D1", "D2", "D3"],
     "CAN": ["TX", "RX"],
-    "SAI": ["CK", "SD", "FS"],
+    "SAI": ["SCK_A", "FS_A", "SD_A", "SD_B"],
 }
 
 CONDITIONAL_VAR = {
