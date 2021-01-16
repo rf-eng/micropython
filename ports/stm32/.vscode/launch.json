@@ -18,12 +18,12 @@
 			"windows": {
 			    "armToolchainPath": "${env:ELITEBOARDDIR}/gcc/bin/",
                 "BMPGDBSerialPort": "COM9", /*If any of your ports are 10 or over, use this format: \\.\COM10*/
-                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"], /*activate srst and reattach+load*/
+                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"] /*activate srst and reattach+load*/
             },
             "osx": {
 			    "armToolchainPath": "/usr/local/bin/",
                 "BMPGDBSerialPort": "/dev/cu.usbmodem79AA5FA21",
-                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"], /*activate srst and reattach+load*/
+                "preLaunchCommands": ["mon connect_srst enable","mon hard_srst","mon swdp_scan","att 1","load"] /*activate srst and reattach+load*/
             },
             "runToMain": false,
             /*"interface": "jtag",*/ /*swdp works much better*/
