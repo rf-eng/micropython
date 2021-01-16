@@ -535,7 +535,8 @@ const dma_descr_t dma_DAC_2_TX = { DMA1_Stream6, DMA_REQUEST_DAC1_CH2, dma_id_6,
 const dma_descr_t dma_SPI_3_TX = { DMA1_Stream7, DMA_REQUEST_SPI3_TX, dma_id_7,   &dma_init_struct_spi_i2c };
 const dma_descr_t dma_I2C_1_TX = { DMA1_Stream7, DMA_REQUEST_I2C1_TX, dma_id_7,   &dma_init_struct_spi_i2c };
 const dma_descr_t dma_I2C_2_TX = { DMA1_Stream7, DMA_REQUEST_I2C2_TX, dma_id_7,   &dma_init_struct_spi_i2c };
-const dma_descr_t dma_I2S_2_TX = { DMA1_Stream0, DMA_REQUEST_SAI1_B, dma_id_0,  &dma_init_struct_i2s };
+const dma_descr_t dma_SAI1_B_TX = { DMA1_Stream0, DMA_REQUEST_SAI1_B, dma_id_0,  &dma_init_struct_i2s };
+const dma_descr_t dma_SAI1_A_RX = { DMA1_Stream1, DMA_REQUEST_SAI1_A, dma_id_1,  &dma_init_struct_i2s };
 
 // DMA2 streams
 #if MICROPY_HW_ENABLE_DCMI

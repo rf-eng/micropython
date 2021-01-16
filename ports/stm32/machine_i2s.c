@@ -93,8 +93,8 @@
 #define HAL_AUDIO_DEINIT HAL_SAI_DeInit
 #define AUDIO_TX_DMA HAL_SAI_Transmit_DMA
 #define AUDIO_RX_DMA HAL_SAI_Receive_DMA
-#define AUDIO_INSTANCE_1 SAI1_Block_B  //I2S1
-#define AUDIO_INSTANCE_2 SAI1_Block_A
+#define AUDIO_INSTANCE_2 SAI1_Block_B
+#define AUDIO_INSTANCE_1 SAI1_Block_A
 
 SAI_HandleTypeDef hsai_BlockA1;
 SAI_HandleTypeDef hsai_BlockB1;
@@ -105,7 +105,8 @@ SAI_HandleTypeDef hsai_BlockB1;
 #define QUEUE_CAPACITY (10)
 
 #define DMA_BUFFER __attribute__((section(".dma_buffer"))) //__attribute__ ((aligned (4)))
-DMA_BUFFER static uint8_t dma_buffer_audio[SIZEOF_DMA_BUFFER_IN_BYTES];
+DMA_BUFFER static uint8_t dma_buffer_audio_TX[SIZEOF_DMA_BUFFER_IN_BYTES];
+DMA_BUFFER static uint8_t dma_buffer_audio_RX[SIZEOF_DMA_BUFFER_IN_BYTES];
 
 typedef enum {
     TOP_HALF    = 0,
@@ -607,8 +608,8 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
         printf("error periph clk config");
     }
     __HAL_RCC_SAI1_CLK_ENABLE();
-    i2s_obj->i2s.Instance = AUDIO_INSTANCE_1;
-    i2s_obj->tx_dma_descr = &dma_I2S_2_TX;    
+    i2s_obj->i2s.Instance = AUDIO_INSTANCE_2;
+    i2s_obj->tx_dma_descr = &dma_SAI1_B_TX;
     #else
     
     #endif
@@ -700,7 +701,7 @@ void AUDIO_ERRORCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 
 void AUDIO_RXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == AUDIO_INSTANCE_1) {
+    if (hi2s->Instance == AUDIO_INSTANCE_2) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
@@ -713,7 +714,7 @@ void AUDIO_RXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 void AUDIO_RXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     //printf("in rx half cplt callback");
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == AUDIO_INSTANCE_1) {
+    if (hi2s->Instance == AUDIO_INSTANCE_2) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
@@ -726,7 +727,7 @@ void AUDIO_RXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 void AUDIO_TXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     //printf("in tx cplt callback");
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == AUDIO_INSTANCE_1) {
+    if (hi2s->Instance == AUDIO_INSTANCE_2) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
@@ -738,7 +739,7 @@ void AUDIO_TXCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
 
 void AUDIO_TXHALFCPLTCALLBACK(AUDIO_HANDLE_TYPEDEF *hi2s) {
     machine_i2s_obj_t *self;
-    if (hi2s->Instance == AUDIO_INSTANCE_1) {
+    if (hi2s->Instance == AUDIO_INSTANCE_2) {
         self = &(machine_i2s_obj)[0];
     } else {
         self = &(machine_i2s_obj)[1];
@@ -896,7 +897,16 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     //printf("callable = %d\n", mp_obj_is_callable(args[ARG_callback].u_obj));  // TODO test with no callback
     // TODO raise exception if callback is bogus ?
     
-    (*self).dma_buffer = &dma_buffer_audio[0];
+    if(i2s_mode == (I2S_MODE_MASTER_TX))
+    {
+        printf("Use TX buffer\n");
+        (*self).dma_buffer = &dma_buffer_audio_TX[0];
+    }
+    else
+    {
+        printf("Use RX buffer\n");
+        (*self).dma_buffer = &dma_buffer_audio_RX[0];
+    }
 
     self->sck = args[ARG_sck].u_obj;
     self->ws = args[ARG_ws].u_obj;
@@ -911,18 +921,28 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     SAI_InitTypeDef *init = &self->i2s.Init;
     SAI_FrameInitTypeDef *frameinit = &self->i2s.FrameInit;
     SAI_SlotInitTypeDef *slotinit = &self->i2s.SlotInit;
+    if(i2s_mode == (I2S_MODE_MASTER_TX))
+    {
+        init->AudioMode = SAI_MODESLAVE_TX;
+        init->Synchro = SAI_SYNCHRONOUS;
+        init->TriState = SAI_OUTPUT_NOTRELEASED;
+    }
+    else
+    {
+        init->AudioMode = SAI_MODESLAVE_RX;
+        init->Synchro = SAI_ASYNCHRONOUS;
+        init->TriState = SAI_OUTPUT_RELEASED;
+    }    
     init->Protocol = SAI_FREE_PROTOCOL;
-    init->AudioMode = SAI_MODESLAVE_TX;
     init->DataSize = SAI_DATASIZE_16;
     init->FirstBit = SAI_FIRSTBIT_MSB;
     init->ClockStrobing = SAI_CLOCKSTROBING_FALLINGEDGE;
-    init->Synchro = SAI_SYNCHRONOUS;
+
     init->OutputDrive = SAI_OUTPUTDRIVE_DISABLE;
     init->FIFOThreshold = SAI_FIFOTHRESHOLD_EMPTY;
     init->SynchroExt = SAI_SYNCEXT_DISABLE;
     init->MonoStereoMode = SAI_STEREOMODE;
     init->CompandingMode = SAI_NOCOMPANDING;
-    init->TriState = SAI_OUTPUT_NOTRELEASED;
     init->PdmInit.Activation = DISABLE;
     init->PdmInit.MicPairsNbr = 1;
     init->PdmInit.ClockEnable = SAI_PDM_CLOCK1_ENABLE;
@@ -1196,7 +1216,7 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
         #if defined (USE_SAI)
         // Configure MPU
         uint32_t irq_state = mpu_config_start();
-        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_audio[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
+        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_audio_TX[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
         mpu_config_end(irq_state);
         #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?

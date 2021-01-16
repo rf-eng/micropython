@@ -61,6 +61,8 @@ extern const dma_descr_t dma_I2S_1_RX;
 extern const dma_descr_t dma_I2S_1_TX;
 extern const dma_descr_t dma_I2S_2_RX;
 extern const dma_descr_t dma_I2S_2_TX;
+extern const dma_descr_t dma_SAI1_B_TX;
+extern const dma_descr_t dma_SAI1_A_RX;
 
 #elif defined(STM32L0)
 
