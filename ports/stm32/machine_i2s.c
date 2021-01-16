@@ -1216,7 +1216,7 @@ STATIC mp_obj_t machine_i2s_start(mp_obj_t self_in) {  // TODO(?) self_in ---> s
         #if defined (USE_SAI)
         // Configure MPU
         uint32_t irq_state = mpu_config_start();
-        mpu_config_region(MPU_REGION_ETH, (uint32_t)&dma_buffer_audio_TX[0], MPU_CONFIG_ETH(MPU_REGION_SIZE_16KB));
+        mpu_config_region(MPU_REGION_AUDIO, (uint32_t)&dma_buffer_audio_TX[0], MPU_CONFIG_AUDIO(MPU_REGION_SIZE_1KB));
         mpu_config_end(irq_state);
         #endif
         machine_i2s_feed_dma(self, TOP_HALF);  // TODO is machine_i2s prefix really desirable for STATIC?
