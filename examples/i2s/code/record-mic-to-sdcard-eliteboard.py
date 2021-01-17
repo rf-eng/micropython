@@ -24,7 +24,7 @@ if uos.uname().machine.find('PYBD') == 0:
 WAV_FILE = 'test.wav'
 WAV_SAMPLE_SIZE_IN_BITS = 16
 SAMPLE_RATE_IN_HZ = 8000
-RECORD_TIME_IN_SECONDS = 10
+RECORD_TIME_IN_SECONDS = 5
 #======= USER CONFIGURATION =======
 
 NUM_CHANNELS = num_channels[I2S.MONO]
@@ -67,7 +67,7 @@ audio_in = I2S(
     sck=sck_pin, ws=ws_pin, sd=sd_pin_in, 
     mode=I2S.RX,
     bits=WAV_SAMPLE_SIZE_IN_BITS,
-    format=I2S.MONO,
+    format=I2S.STEREO,
     rate=SAMPLE_RATE_IN_HZ,
     buffers = [buf_1, buf_2, buf_3, buf_4, buf_5],
     callback=i2s_callback)
@@ -128,7 +128,7 @@ while num_sample_bytes_written_to_wav < SAMPLE_RATE_IN_HZ * RECORD_TIME_IN_SECON
         break
 
 wav.close()
-audio_in.deinit()
+#audio_in.deinit()
 print('==========  DONE RECORDING ==========')
 
 # ===== PLAYBACK ======
