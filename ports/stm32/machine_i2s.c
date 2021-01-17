@@ -608,8 +608,14 @@ STATIC bool i2s_init(machine_i2s_obj_t *i2s_obj) {
         printf("error periph clk config");
     }
     __HAL_RCC_SAI1_CLK_ENABLE();
-    i2s_obj->i2s.Instance = AUDIO_INSTANCE_2;
-    i2s_obj->tx_dma_descr = &dma_SAI1_B_TX;
+    if (i2s_obj->mode == I2S_MODE_MASTER_TX) {
+        i2s_obj->i2s.Instance = AUDIO_INSTANCE_2;
+        i2s_obj->tx_dma_descr = &dma_SAI1_B_TX;
+    }
+    else {
+        i2s_obj->i2s.Instance = AUDIO_INSTANCE_1;
+        i2s_obj->rx_dma_descr = &dma_SAI1_A_RX;
+    }
     #else
     
     #endif
@@ -795,8 +801,10 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     if (mp_obj_is_type(args[ARG_sck].u_obj, &pin_type)) {
         #if defined (USE_SAI)
         pin_af = pin_find_af(args[ARG_sck].u_obj, AF_FN_SAI, self->i2s_id);
-        if (pin_af->type != AF_PIN_TYPE_SAI_SCK_A) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SCK pin for SAI%d"), self->i2s_id);
+        if(self->i2s_id == 1) {
+            if (pin_af->type != AF_PIN_TYPE_SAI_SCK_A) {
+                mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SCK pin for SAI%d"), self->i2s_id);
+            }
         }
         #else
         pin_af = pin_find_af(args[ARG_sck].u_obj, AF_FN_I2S, self->i2s_id);
@@ -812,8 +820,10 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     if (mp_obj_is_type(args[ARG_ws].u_obj, &pin_type)) {
         #if defined (USE_SAI)        
         pin_af = pin_find_af(args[ARG_ws].u_obj, AF_FN_SAI, self->i2s_id);
-        if (pin_af->type != AF_PIN_TYPE_SAI_FS_A) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid FS pin for SAI%d"), self->i2s_id);
+        if(self->i2s_id == 1) {
+            if (pin_af->type != AF_PIN_TYPE_SAI_FS_A) {
+                mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid FS pin for SAI%d"), self->i2s_id);
+            }
         }
         #else        
         pin_af = pin_find_af(args[ARG_ws].u_obj, AF_FN_I2S, self->i2s_id);
@@ -829,8 +839,15 @@ STATIC void machine_i2s_init_helper(machine_i2s_obj_t *self, size_t n_pos_args, 
     if (mp_obj_is_type(args[ARG_sd].u_obj, &pin_type)) {
         #if defined (USE_SAI)
         pin_af = pin_find_af(args[ARG_sd].u_obj, AF_FN_SAI, self->i2s_id);
-        if (pin_af->type != AF_PIN_TYPE_SAI_SD_A) {
-            mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SD pin for I2S%d"), self->i2s_id);
+        if(self->i2s_id == 1) {
+            if (pin_af->type != AF_PIN_TYPE_SAI_SD_A) {
+                mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SD pin for I2S%d"), self->i2s_id);
+            }
+        }
+        else {
+            if (pin_af->type != AF_PIN_TYPE_SAI_SD_B) {
+                //mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("no valid SD pin for I2S%d"), self->i2s_id);
+            }
         }
         #else
         pin_af = pin_find_af(args[ARG_sd].u_obj, AF_FN_I2S, self->i2s_id);

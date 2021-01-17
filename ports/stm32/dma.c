@@ -108,7 +108,7 @@ static const DMA_InitTypeDef dma_init_struct_spi_i2c = {
 #if defined (USE_SAI)
 static const DMA_InitTypeDef dma_init_struct_i2s = {
     .Request = 0 /*DMA_REQUEST_SAI1_B*/,
-    .Direction = DMA_MEMORY_TO_PERIPH,
+    .Direction = 0 /*DMA_MEMORY_TO_PERIPH*/,
     .PeriphInc = DMA_PINC_DISABLE,
     .MemInc = DMA_MINC_ENABLE,
     .PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD,
