@@ -118,7 +118,8 @@ class WM8731:
         #data &= ~(1<<WM8731_INSEL_BIT_NUM) #0: select line in
         data |= (1<<WM8731_INSEL_BIT_NUM) #1: select mic in
         data &= ~(1<<WM8731_MUTEMIC_BIT_NUM) #0: disable micmute
-        data &= ~(1<<WM8731_MICBOOST_BIT_NUM) #0: no mic boost
+        #data &= ~(1<<WM8731_MICBOOST_BIT_NUM) #0: no mic boost
+        data |= (1<<WM8731_MICBOOST_BIT_NUM) #1: 20dB mic boost
         self.writeReg(WM8731_ANALOG_AUDIO_PATH_CTRL_ADR, data)
 
     def conf_linein(self, volume_dB):
