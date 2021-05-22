@@ -479,6 +479,17 @@ STATIC mp_obj_t esp_scan(mp_obj_t self_in) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_scan_obj, esp_scan);
 
+STATIC mp_obj_t esp_freedom(mp_obj_t self_in, mp_obj_t buf_in) {
+    wlan_if_obj_t *self = MP_OBJ_TO_PTR(self_in);
+
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(buf_in, &bufinfo, MP_BUFFER_READ);
+
+    esp_wifi_80211_tx(self->if_id, bufinfo.buf, bufinfo.len, false);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_2(esp_freedom_obj, esp_freedom);
+
 STATIC mp_obj_t esp_isconnected(mp_obj_t self_in) {
     wlan_if_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->if_id == WIFI_IF_STA) {
@@ -730,6 +741,7 @@ unknown:
 MP_DEFINE_CONST_FUN_OBJ_KW(esp_config_obj, 1, esp_config);
 
 STATIC const mp_rom_map_elem_t wlan_if_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_freedom), MP_ROM_PTR(&esp_freedom_obj) },
     { MP_ROM_QSTR(MP_QSTR_active), MP_ROM_PTR(&esp_active_obj) },
     { MP_ROM_QSTR(MP_QSTR_connect), MP_ROM_PTR(&esp_connect_obj) },
     { MP_ROM_QSTR(MP_QSTR_disconnect), MP_ROM_PTR(&esp_disconnect_obj) },
