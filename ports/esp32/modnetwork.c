@@ -37,6 +37,7 @@
 
 #include "py/nlr.h"
 #include "py/objlist.h"
+#include "py/objstr.h"
 #include "py/runtime.h"
 #include "py/mphal.h"
 #include "py/mperrno.h"
@@ -479,7 +480,135 @@ STATIC mp_obj_t esp_scan(mp_obj_t self_in) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(esp_scan_obj, esp_scan);
 
-STATIC mp_obj_t esp_freedom(mp_obj_t self_in, mp_obj_t buf_in) {
+STATIC mp_obj_t *esp_monitor_list = NULL;
+STATIC mp_obj_t esp_monitor_mac_filter;
+STATIC byte *esp_monitor_buf;
+STATIC size_t esp_monitor_buf_len;
+STATIC bool new_callback = false;
+
+IRAM_ATTR static void esp_monitor_cb(void *result, wifi_promiscuous_pkt_type_t type)
+{ //IRAM faster?
+    //mp_printf(&mp_plat_print, "in callback\n");
+    wifi_promiscuous_pkt_t *monitor = (wifi_promiscuous_pkt_t *)result;
+    if (esp_monitor_list == NULL)
+    {
+        return;
+    }
+    // mp_printf(&mp_plat_print, "payload len: %d\n", monitor->rx_ctrl.sig_len);
+    // mp_printf(&mp_plat_print, "rssi: %d\n", monitor->rx_ctrl.rssi);
+    // mp_printf(&mp_plat_print, "type: %d\n", type);
+    if (monitor->rx_ctrl.sig_len > 0)
+    {
+        esp_monitor_buf = malloc(monitor->rx_ctrl.sig_len);
+        memcpy(esp_monitor_buf, monitor->payload, monitor->rx_ctrl.sig_len);
+        esp_monitor_buf_len = monitor->rx_ctrl.sig_len;
+        new_callback = true;
+    }
+}
+
+STATIC mp_obj_t esp_monitor(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args)
+{
+    require_if(pos_args[0], WIFI_IF_STA);
+    // check that STA mode is active
+    wifi_mode_t mode;
+    ESP_EXCEPTIONS(esp_wifi_get_mode(&mode));
+    if ((mode & WIFI_MODE_STA) == 0)
+    {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("STA must be active"));
+    }
+
+    enum
+    {
+        ARG_mac,
+        ARG_ch,
+        ARG_timeout
+    };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_mac, MP_ARG_OBJ, {.u_obj = mp_const_empty_bytes}},
+        {MP_QSTR_ch, MP_ARG_INT, {.u_int = 1}},
+        {MP_QSTR_timeout, MP_ARG_INT, {.u_int = 1}},
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if (MP_OBJ_IS_STR_OR_BYTES(args[ARG_mac].u_obj))
+    {
+        esp_monitor_mac_filter = args[ARG_mac].u_obj;
+    }
+    else
+    {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError,
+                                           "invalid mac type"));
+    }
+
+    uint32_t ch = args[ARG_ch].u_int;
+    uint32_t timeout_us = args[ARG_timeout].u_int * 1000000;
+    timeout_us = timeout_us > 1000000 ? timeout_us : 1000000;
+
+    mp_obj_t list = mp_obj_new_list(0, NULL);
+    esp_monitor_list = &list;
+
+    //Disconnect all connections
+    //esp_wifi_disconnect();
+    //esp_wifi_set_promiscuous_filter(&wifi_filter);
+    //Register the callback function
+    esp_wifi_set_promiscuous_rx_cb(esp_monitor_cb);
+    //Set the mac address to filter
+    /*if (args[ARG_mac].u_obj != mp_const_none){
+        const char *mac = mp_obj_str_get_str(esp_monitor_mac_filter);
+        wifi_promiscuous_set_mac((const uint8_t *)mac);
+    }*/
+    esp_wifi_set_promiscuous(true); //wifi_promiscuous_enable(1);
+    //Set the channel
+    esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+    struct timeval tv_now;
+    gettimeofday(&tv_now, NULL);
+    int64_t start_time_us = (int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec;
+    while (esp_monitor_list != NULL)
+    {
+        if (MP_STATE_VM(mp_pending_exception) != NULL)
+        {
+            esp_monitor_list = NULL;
+            mp_obj_t obj = MP_STATE_VM(mp_pending_exception);
+            MP_STATE_VM(mp_pending_exception) = MP_OBJ_NULL;
+            nlr_raise(obj);
+        }
+        gettimeofday(&tv_now, NULL);
+        int64_t cur_time_us = (int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec;
+        if (cur_time_us - start_time_us >= timeout_us)
+        {
+            esp_monitor_list = NULL;
+        }
+        if (new_callback)
+        {
+            new_callback = false;
+            nlr_buf_t nlr;
+            if (nlr_push(&nlr) == 0)
+            {
+                //mp_printf(&mp_plat_print, "create new byte array\n");
+                mp_obj_list_append(*esp_monitor_list,
+                                   mp_obj_new_bytearray(esp_monitor_buf_len, MP_OBJ_FROM_PTR(esp_monitor_buf)));
+                free(esp_monitor_buf);
+                nlr_pop();
+            }
+            else
+            {
+                mp_obj_print_exception(&mp_plat_print, MP_OBJ_FROM_PTR(nlr.ret_val));
+            }
+        }
+    }
+    if (list == MP_OBJ_NULL)
+    {
+        nlr_raise(mp_obj_new_exception_msg(&mp_type_OSError, "monitor failed"));
+    }
+    esp_wifi_set_promiscuous(false); //wifi_promiscuous_enable(0);
+    return list;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_KW(esp_monitor_obj, 1, esp_monitor);
+
+STATIC mp_obj_t esp_raw_80211_tx(mp_obj_t self_in, mp_obj_t buf_in)
+{
     wlan_if_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
     mp_buffer_info_t bufinfo;
@@ -742,6 +871,7 @@ MP_DEFINE_CONST_FUN_OBJ_KW(esp_config_obj, 1, esp_config);
 
 STATIC const mp_rom_map_elem_t wlan_if_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_raw_80211_tx), MP_ROM_PTR(&esp_raw_80211_tx_obj) },
+    { MP_ROM_QSTR(MP_QSTR_monitor), MP_ROM_PTR(&esp_monitor_obj) },
     { MP_ROM_QSTR(MP_QSTR_active), MP_ROM_PTR(&esp_active_obj) },
     { MP_ROM_QSTR(MP_QSTR_connect), MP_ROM_PTR(&esp_connect_obj) },
     { MP_ROM_QSTR(MP_QSTR_disconnect), MP_ROM_PTR(&esp_disconnect_obj) },
